@@ -1,6 +1,6 @@
 <template>
     <v-app>
-        <v-container>
+        <v-container class="pa-0 ga-0 ma-0">
             <parallax-effect :position="position" />
             <tug-of-war-slider v-model:position="position" />
         </v-container>
