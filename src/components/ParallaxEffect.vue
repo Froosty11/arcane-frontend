@@ -14,8 +14,8 @@
                     alt="Red Team"
                 />
                 <lightning-particle
-                    :x="38"
-                    :y="492"
+                    :x="290"
+                    :y="990"
                     :direction="-15"
                     :active="position > 0"
                     :position="position"
