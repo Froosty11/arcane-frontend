@@ -13,7 +13,7 @@
             @update:model-value="updatePosition"
         ></v-slider>
     </div>
-</template>np
+</template>
 
 <script setup>
 import { ref, defineEmits } from 'vue'
