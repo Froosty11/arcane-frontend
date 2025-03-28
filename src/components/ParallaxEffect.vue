@@ -6,37 +6,61 @@
             :style="backgroundStyle"
         />
 
+        <background-gradient :position="position" />
+
         <div class="red-character-container" :style="redImageStyle">
             <div class="red-content" style="transform: scaleX(-1)">
                 <v-img
                     class="parallax-image red-image"
                     :src="redImage"
                     alt="Red Team"
+                    :style="redLightingStyle"
                 />
                 <lightning-particle
+                    ref="redLightning"
                     :x="290"
                     :y="990"
                     :direction="-15"
-                    :active="position > 0"
+                    :active="position > 10"
                     :position="position"
+                    color="#e2c4d2"
+                    glow-color="#ff1493"
+                    @opacity-change="redOpacity = $event"
                 />
             </div>
         </div>
-        <v-img
-            class="parallax-image blue-image"
-            :src="blueImage"
-            :style="blueImageStyle"
-            alt="Blue Team"
-        />
+
+        <div class="blue-character-container" :style="blueImageStyle">
+            <div class="blue-content">
+                <v-img
+                    class="parallax-image blue-image"
+                    :src="blueImage"
+                    alt="Blue Team"
+                    :style="blueLightingStyle"
+                />
+                <lightning-particle
+                    ref="blueLightning"
+                    :x="450"
+                    :y="600"
+                    :direction="0"
+                    :active="position < -10"
+                    :position="position"
+                    color="#a0e6ff"
+                    glow-color="#00bfff"
+                    @opacity-change="blueOpacity = $event"
+                />
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
-import {computed} from 'vue';
+import {computed, ref} from 'vue';
 import redImage from '../assets/red-image.png';
 import blueImage from '../assets/blue-image.png';
 import backgroundImage from '../assets/back-dashless.png';
 import LightningParticle from './LightningParticle.vue';
+import BackgroundGradient from "@/components/BackgroundGradient.vue";
 
 const props = defineProps({
     position: {
@@ -45,26 +69,24 @@ const props = defineProps({
     },
 });
 
-const backgroundStyle = computed(() => ({
-    transform: `scale(1.1) translateX(${(props.position / 200) * 30}px) rotateY(${(props.position / 100) * 5}deg)`,
-    transition: "transform 0.2s ease"
-}));
+const redOpacity = ref(0);
+const blueOpacity = ref(0);
 
-// Red (Jinx) transform variables
-const redMinX = 200;     // Position when losing (position low)
-const redMinY = -50;       // Position when losing (position low)
-const redMinScale = 1.2;   // Scale when losing (position low)
-const redMaxX = 600;     // Position when winning (position high)
-const redMaxY = -200;    // Position when winning (position high)
-const redMaxScale = 1.5; // Scale when winning (position high)
+// ... existing imports and refs ...
 
-// Blue (Vi) transform variables
-const blueMinX = -200;    // Position when losing (position high)
-const blueMinY = 100;      // Position when losing (position high)
-const blueMinScale = 1.2;  // Scale when losing (position high)
-const blueMaxX = -600;    // Position when winning (position low)
-const blueMaxY = 0;   // Position when winning (position low)
-const blueMaxScale = 1.5;// Scale when winning (position low)
+const redMinX = 200;
+const redMinY = -50;
+const redMinScale = 1.2;
+const redMaxX = 600;
+const redMaxY = -200;
+const redMaxScale = 1.5;
+
+const blueMinX = -200;
+const blueMinY = 100;
+const blueMinScale = 1.2;
+const blueMaxX = -600;
+const blueMaxY = 0;
+const blueMaxScale = 1.5;
 
 const redImageStyle = computed(() => ({
     transform: `translate3d(
@@ -80,11 +102,21 @@ const blueImageStyle = computed(() => ({
         ${blueMinX + (-props.position / 100) * (blueMaxX - blueMinX)}px,
         ${blueMinY + (-props.position / 100) * (blueMaxY - blueMinY)}px,
         0)
-        scaleX(-1)
         scale(${blueMinScale + (-props.position / 100) * (blueMaxScale - blueMinScale)})`,
     transition: "transform 0.2s ease"
 }));
 
+const backgroundStyle = computed(() => ({
+    transform: `scale(1.1) translateX(${(props.position / 200) * 30}px) rotateY(${(props.position / 100) * 5}deg)`,
+    transition: "transform 0.2s ease"
+}));
+const redLightingStyle = computed(() => ({
+    filter: `brightness(${1 + redOpacity.value * 0.3})`
+}));
+
+const blueLightingStyle = computed(() => ({
+    filter: `brightness(${1 + blueOpacity.value * 0.3})`
+}));
 </script>
 
 <style scoped>
@@ -122,13 +154,7 @@ const blueImageStyle = computed(() => ({
     z-index: 2;
 }
 
-.red-content {
-    position: relative;
-    height: 100%;
-    width: 100%;
-}
-
-.blue-image {
+.blue-character-container {
     position: absolute;
     right: 5%;
     height: 100%;
@@ -136,13 +162,21 @@ const blueImageStyle = computed(() => ({
     z-index: 1;
 }
 
-/* Target v-img's internal structure */
+.red-content, .blue-content {
+    position: relative;
+    height: 100%;
+    width: 100%;
+}
+
+.blue-image {
+    transform: scaleX(-1);
+}
+
 .red-image :deep(.v-img__img) {
     object-fit: contain;
     object-position: bottom;
 }
 
-/* Add to your existing styles */
 .particles-layer {
     position: absolute;
     inset: 0;

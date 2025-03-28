@@ -9,6 +9,7 @@
                 :x2="segment.end.x"
                 :y2="segment.end.y"
                 class="lightning-segment"
+                :style="lightningStyle"
             />
         </g>
     </svg>
@@ -17,12 +18,16 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 
+const emit = defineEmits(['opacity-change']);
+
 const props = defineProps({
     x: { type: Number, required: true },
     y: { type: Number, required: true },
     active: { type: Boolean, default: true },
     direction: { type: Number, default: 90 },
-    position: { type: Number, default: 0 }
+    position: { type: Number, default: 0 },
+    color: { type: String, default: '#e2c4d2' },
+    glowColor: { type: String, default: '#ff1493' }
 });
 
 const branches = ref([]);
@@ -84,7 +89,6 @@ const updateLightning = () => {
         for (let i = 0; i < branchCount; i++) {
             const spreadAngle = 10 + intensity * 5;
             const angleOffset = (Math.random() - 0.5) * spreadAngle;
-            // Start 20px from edges
             const startX = 50;
             const startY = 100;
             const branch = generateBranch(startX, startY, props.direction + angleOffset, 0);
@@ -93,9 +97,11 @@ const updateLightning = () => {
 
         lastUpdate.value = currentTime;
         opacity.value = 1;
+        emit('opacity-change', 1);
 
         setTimeout(() => {
             opacity.value = 0;
+            emit('opacity-change', 0);
         }, fadeTime);
     }
 
@@ -109,11 +115,16 @@ const containerStyle = computed(() => ({
     position: 'absolute',
     left: `${props.x}px`,
     top: `${props.y}px`,
-    width: '600px',  // Much larger container
-    height: '600px', // Much larger container
+    width: '600px',
+    height: '600px',
     transform: 'translate(-50%, -50%)',
     opacity: props.active ? opacity.value : 0,
     transition: 'opacity 400ms ease-out'
+}));
+
+const lightningStyle = computed(() => ({
+    stroke: props.color,
+    filter: `drop-shadow(0 0 5px ${props.color}) drop-shadow(0 0 8px ${props.glowColor})`
 }));
 
 onMounted(() => {
@@ -145,9 +156,6 @@ onUnmounted(() => {
 }
 
 .lightning-segment {
-    stroke: #e2c4d2;
     stroke-width: 2;
-    filter: drop-shadow(0 0 5px #e2c4d2)
-    drop-shadow(0 0 8px #ff1493);
 }
 </style>
