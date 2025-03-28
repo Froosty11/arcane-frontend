@@ -56,8 +56,8 @@
 
 <script setup>
 import {computed, ref} from 'vue';
-import redImage from '../assets/red-image.png';
-import blueImage from '../assets/blue-image.png';
+import redImage from '../assets/JINX.png';
+import blueImage from '../assets/VI.png';
 import backgroundImage from '../assets/back-dashless.png';
 import LightningParticle from './LightningParticle.vue';
 import BackgroundGradient from "@/components/BackgroundGradient.vue";
@@ -169,6 +169,9 @@ const blueLightingStyle = computed(() => ({
 }
 
 .blue-image {
+    transform: scaleX(1);
+}
+.red-image{
     transform: scaleX(-1);
 }
 
