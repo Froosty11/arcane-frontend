@@ -1,8 +1,7 @@
 <template>
-    <div>
+    <div class="tug-of-war-slider">
         <v-slider
-            class="tug-of-war-slider"
-            v-model="position"
+            v-model="localPosition"
             :min="-100"
             :max="100"
             label="Tug of War Slider"
@@ -10,34 +9,43 @@
             color="red"
             track-color="blue"
             thumb-color="black"
-            @update:model-value="updatePosition"
         ></v-slider>
     </div>
 </template>
 
 <script setup>
-import { ref, defineEmits } from 'vue'
+import { computed } from 'vue'
 
-const emit = defineEmits(['update:position'])
-const position = ref(0)
+const props = defineProps({
+    modelValue: {  // Changed from position to modelValue
+        type: Number,
+        required: true
+    }
+});
 
-const updatePosition = (value) => {
-    emit('update:position', value)
-}
+const emit = defineEmits(['update:modelValue']);  // Changed from update:position
+
+const localPosition = computed({
+    get: () => props.modelValue,  // Changed from props.position
+    set: (value) => emit('update:modelValue', value)  // Changed from update:position
+});
 </script>
 
 <style>
-/* Remove scoped to ensure styles are applied globally */
 .tug-of-war-slider .v-slider-track__fill {
     opacity: 1 !important;
 }
 
 .tug-of-war-slider .v-slider-track__background {
     opacity: 1 !important;
-    height: var(--v-slider-track-size) !important;
+    height: 6px !important;
 }
 
 .tug-of-war-slider .v-slider-track {
-    height: var(--v-slider-track-size) !important;
+    height: 6px !important;
+}
+
+.tug-of-war-slider .v-slider-thumb {
+    cursor: pointer;
 }
 </style>

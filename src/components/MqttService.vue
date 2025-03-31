@@ -1,7 +1,7 @@
 <template>
     <div class="mqtt-debug" v-if="props.debug">
         <p>MQTT Status: {{ connectionStatus }}</p>
-        <p>Position: {{ position }}</p>
+        <p>Position: {{ modelValue }}</p>
         <div class="message-log">
             <p>Last 10 messages:</p>
             <ul>
@@ -19,14 +19,17 @@ import mqtt from 'mqtt';
 import gameManager from '@/utils/GameManager';
 
 const props = defineProps({
+    modelValue: {
+        type: Number,
+        required: true
+    },
     debug: {
         type: Boolean,
         default: true
     }
 });
 
-const emit = defineEmits(['update:position']);
-const position = ref(0);
+const emit = defineEmits(['update:modelValue']);
 const connectionStatus = ref('Disconnecting');
 const messageLog = ref([]);
 let client;
@@ -57,21 +60,17 @@ const interpretReceipt = (receipt) => {
         return;
     }
 
-    // Log all messages
     result.messages.forEach(msg => {
         addToMessageLog(msg);
     });
 
-    // Log purchases
     result.purchases.forEach(purchase => {
         publishLog('purchase', `${purchase.item} x${purchase.count} for team ${purchase.team}`);
     });
 
-    // Update position if score changed
     if (result.scoreChange !== 0) {
-        const newPosition = Math.min(100, Math.max(-100, position.value + result.scoreChange));
-        position.value = newPosition;
-        emit('update:position', newPosition);
+        const newPosition = Math.min(100, Math.max(-100, props.modelValue + result.scoreChange));
+        emit('update:modelValue', newPosition);
         publishLog('position', `Position changed by ${result.scoreChange} to ${newPosition}`);
     }
 };
@@ -105,10 +104,15 @@ const connectMqtt = () => {
         if (topic === 'kistan/kvitto') {
             interpretReceipt(message.toString());
         } else if (topic === 'kistan/arcane') {
-            const newPosition = parseFloat(message.toString());
-            if (!isNaN(newPosition)) {
-                position.value = Math.min(100, Math.max(-100, newPosition));
-                emit('update:position', position.value);
+            try {
+                const delta = parseFloat(message.toString());
+                if (!isNaN(delta)) {
+                    const newPosition = Math.min(100, Math.max(-100, props.modelValue + delta));
+                    emit('update:modelValue', newPosition);
+                    publishLog('position', `Position adjusted by ${delta} to ${newPosition}`);
+                }
+            } catch (error) {
+                publishLog('error', `Invalid arcane command: ${error.message}`);
             }
         }
     });

@@ -1,15 +1,13 @@
 // src/utils/GameManager.js
 
-import {el} from "vuetify/locale";
 
-const COMBO_TIMEOUT = 30 * 1000; // 30 seconds timeout between purchases
 
 const productConfig = {
     'Pepsi': { baseScore: 10, combo: true},
-    'Zingo': { baseScore: -10, combo: true},
+    'Zingo': { baseScore: 10, combo: true},
     'Cola': { baseScore: 8, combo: true},
-    'Fanta': { baseScore: -8,combo: true},
-    'Din mamma': { baseScore: -15, combo: true},
+    'Fanta': { baseScore: 8,combo: true},
+    'Din mamma': { baseScore: 15, combo: true},
     'Is Vatten': { baseScore: 15, combo: true}
 };
 
@@ -41,6 +39,7 @@ class GameManager {
             let totalScore = 0;
             let messages = [];
 
+            // Convert receipt items to flat array
             let items = [];
             for (const item of receiptData.sold) {
                 for (let i = 0; i < item.count; i++) {
@@ -48,84 +47,66 @@ class GameManager {
                 }
             }
 
-            console.log("SOLD ITEMS NEW ORDER: ")
+            console.log("SOLD ITEMS NEW ORDER: ");
             console.log(items);
 
-            // Calculate base scores
-            items.forEach(itemName => {
-                if (productConfig[itemName]) {
-                    totalScore += productConfig[itemName].baseScore * currentMultiplier;
-                }
-            });
-
-            let commonItems = [];
-            if(team === 'TMEIT') {
-                commonItems = items.filter(value => this.comboTMEIT.includes(value) && items.includes(value));
-            } else {
-                commonItems = items.filter(value => this.comboITK.includes(value) && items.includes(value));
-            }
-
-
-
-            let newComboItems = [];
-            if(team === 'TMEIT') {
-                newComboItems = this.comboTMEIT.filter(value => commonItems.includes(value) && this.comboTMEIT.includes(value));
-            } else {
-                newComboItems = this.comboITK.filter(value => commonItems.includes(value) && this.comboITK.includes(value));
-            }
-
-
-
-            // Update combo arrays
+            // Update combo arrays with new items
             if (team === 'TMEIT') {
-                this.comboTMEIT = [...items, ...newComboItems];  // This will keep duplicates
+                this.comboTMEIT = [...this.comboTMEIT, ...items];
             } else {
-                this.comboITK = [...items, ...newComboItems];  // This will keep duplicates
+                this.comboITK = [...this.comboITK, ...items];
             }
 
-
-            // now for each item in comboitems we need to add points based on the item and the amount of items in the combo
-            // if theres 4 of one item in the combo, we need to add the points for 4 items times 1.2 (QUADRAKILL).
-            // if theres 5 of one item in the combo, we need to add the points for 5 items times 1.4 (PENTAKILL).
-            // if theres 6 of one item in the combo, we need to add the points for 6 items times 1.6 (HEXAKILL).
-
+            // Calculate points based on current items but use multipliers from combo
             let points = 0;
-            const comboArray = team === 'TMEIT' ? this.comboTMEIT : this.comboITK;
-            const itemCounts = this.getItemCounts(comboArray);
+            const currentItemCounts = this.getItemCounts(items);
+            const comboItemCounts = this.getItemCounts(team === 'TMEIT' ? this.comboTMEIT : this.comboITK);
 
-            Object.entries(itemCounts).forEach(([item, count]) => {
-                if (count >= 4 && productConfig[item]) {
-                    if (count === 4) {
-                        points += productConfig[item].baseScore * 1.2;
-                    } else if (count === 5) {
-                        points += productConfig[item].baseScore * 1.4;
-                    } else if (count >= 6) {
-                        points += productConfig[item].baseScore * 1.6;
-                    }
+            console.log("CURRENT ITEM COUNTS: ");
+            console.log(currentItemCounts);
+
+            console.log("COMBO ITEM COUNTS: ");
+            console.log(comboItemCounts);
+
+            Object.entries(currentItemCounts).forEach(([item, count]) => {
+                if (!productConfig[item]) return;
+
+                const comboCount = comboItemCounts[item] || 0;
+                let basePoints = productConfig[item].baseScore * count;
+
+                console.log(`Processing ${item}: ${count} current, ${comboCount} in combo`);
+
+                if (comboCount >= 6) {
+                    points += basePoints * 1.6;
+                    messages.push(`HEXAKILL multiplier! ${count}x ${item} for ${basePoints * 1.6} points`);
+                    console.log(`HEXAKILL: Added ${basePoints * 1.6} points`);
+                } else if (comboCount === 5) {
+                    points += basePoints * 1.4;
+                    messages.push(`PENTAKILL multiplier! ${count}x ${item} for ${basePoints * 1.4} points`);
+                    console.log(`PENTAKILL: Added ${basePoints * 1.4} points`);
+                } else if (comboCount === 4) {
+                    points += basePoints * 1.2;
+                    messages.push(`QUADRAKILL multiplier! ${count}x ${item} for ${basePoints * 1.2} points`);
+                    console.log(`QUADRAKILL: Added ${basePoints * 1.2} points`);
+                } else {
+                    points += basePoints;
+                    messages.push(`Base score: ${basePoints} points for ${count}x ${item}`);
+                    console.log(`Base: Added ${basePoints} points`);
                 }
             });
 
+            totalScore = points * currentMultiplier;
 
-
-            console.log("COMMON ITEMS: ");
-            console.log(commonItems);
-
-            console.log("TMEIT COMBO ITEMS: ");
-            console.log(this.comboTMEIT);
-
-
-            console.log("POINTS ADDED FOR COMBO: ");
-            totalScore = points*currentMultiplier;
+            console.log("FINAL SCORE: ");
             console.log(totalScore);
-
-            //append
 
             return {
                 scoreChange: Math.round(totalScore),
                 messages,
-                purchases: items
+                purchases: items.map(item => ({ item, count: 1, team }))
             };
         } catch (error) {
+            console.error("ERROR IN CALCULATE RECEIPT: ", error);
             return {
                 error: 'Invalid receipt format: ' + error.message,
                 scoreChange: 0,
