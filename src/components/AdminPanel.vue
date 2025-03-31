@@ -18,7 +18,7 @@
 
         <div class="current-state">
             <h2>Current State</h2>
-            <p>Position: {{ position }}</p>
+            <p>Position: {{ currentPosition }}</p>
             <p>Debug Mode: {{ showDebug ? 'On' : 'Off' }}</p>
             <p>MQTT Status: {{ connectionStatus }}</p>
         </div>
@@ -50,6 +50,8 @@ const props = defineProps({
 const emit = defineEmits(['update:position', 'update:showDebug']);
 const connectionStatus = ref('Disconnecting');
 const messageLog = ref([]);
+const currentPosition = ref(props.position);
+const clientId = 'admin_client_' + Math.random().toString(16).substr(2, 8);
 let client;
 
 const addToMessageLog = (message) => {
@@ -62,7 +64,7 @@ const addToMessageLog = (message) => {
 const connectMqtt = () => {
     const options = {
         protocol: 'wss',
-        clientId: 'admin_client_' + Math.random().toString(16).substr(2, 8)
+        clientId
     };
 
     addToMessageLog('Connecting to MQTT broker...');
@@ -71,6 +73,28 @@ const connectMqtt = () => {
     client.on('connect', () => {
         connectionStatus.value = 'Connected';
         addToMessageLog('Connected successfully');
+
+        // Subscribe to arcanescore to get position updates
+        client.subscribe(['kistan/arcanescore'], (err) => {
+            if (err) {
+                addToMessageLog('Subscribe error: ' + err.message);
+            } else {
+                addToMessageLog('Subscribed to kistan/arcanescore');
+                // Request current position
+                client.publish('kistan/arcane', 'admin:request_position');
+            }
+        });
+    });
+
+    client.on('message', (topic, message) => {
+        const messageStr = message.toString();
+        if (topic === 'kistan/arcanescore' && messageStr.startsWith('client:')) {
+            const newPosition = parseFloat(messageStr.split(':')[1]);
+            if (!isNaN(newPosition)) {
+                currentPosition.value = newPosition;
+                addToMessageLog(`Position updated to: ${newPosition}`);
+            }
+        }
     });
 
     client.on('error', (error) => {
@@ -91,8 +115,9 @@ const connectMqtt = () => {
 
 const publishPosition = (delta) => {
     if (client && client.connected) {
-        client.publish('kistan/arcane', delta.toString());
-        addToMessageLog(`Published position change: ${delta}`);
+        // Add retain: true to the publish options
+        client.publish('kistan/arcane', `admin:${delta}`, { retain: true });
+        addToMessageLog(`Published admin position change: ${delta}`);
     } else {
         addToMessageLog('Error: Not connected to MQTT broker');
     }
@@ -101,7 +126,7 @@ const publishPosition = (delta) => {
 const resetPosition = () => {
     if (client && client.connected) {
         // Calculate delta needed to reset to 0
-        const delta = -props.position;
+        const delta = -currentPosition.value;
         publishPosition(delta);
     }
 };

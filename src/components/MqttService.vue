@@ -32,6 +32,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue']);
 const connectionStatus = ref('Disconnecting');
 const messageLog = ref([]);
+const clientId = 'vue_client_' + Math.random().toString(16).substr(2, 8);
 let client;
 
 const publishLog = (topic, message) => {
@@ -71,6 +72,8 @@ const interpretReceipt = (receipt) => {
     if (result.scoreChange !== 0) {
         const newPosition = Math.min(100, Math.max(-100, props.modelValue + result.scoreChange));
         emit('update:modelValue', newPosition);
+        // Publish the new score with client identifier
+        client.publish('kistan/arcanescore', `client:${newPosition}`, { retain: true });
         publishLog('position', `Position changed by ${result.scoreChange} to ${newPosition}`);
     }
 };
@@ -78,7 +81,7 @@ const interpretReceipt = (receipt) => {
 const connectMqtt = () => {
     const options = {
         protocol: 'wss',
-        clientId: 'vue_client_' + Math.random().toString(16).substr(2, 8)
+        clientId
     };
 
     addToMessageLog('Connecting to MQTT broker...');
@@ -88,31 +91,31 @@ const connectMqtt = () => {
         connectionStatus.value = 'Connected';
         addToMessageLog('Connected successfully');
 
-        client.subscribe(['kistan/kvitto', 'kistan/arcane'], (err) => {
+        client.subscribe(['kistan/kvitto', 'kistan/arcane', 'kistan/arcanescore'], (err) => {
             if (err) {
                 addToMessageLog('Subscribe error: ' + err.message);
             } else {
-                addToMessageLog('Subscribed to kistan/kvitto and kistan/arcane');
+                addToMessageLog('Subscribed to topics');
             }
         });
     });
 
     client.on('message', (topic, message) => {
-        const msg = `${topic}: ${message.toString()}`;
-        addToMessageLog(msg);
+        const messageStr = message.toString();
+        addToMessageLog(`${topic}: ${messageStr}`);
 
         if (topic === 'kistan/kvitto') {
-            interpretReceipt(message.toString());
+            interpretReceipt(messageStr);
         } else if (topic === 'kistan/arcane') {
-            try {
-                const delta = parseFloat(message.toString());
+            // Ignore messages from admin
+            if (messageStr.startsWith('admin:')) {
+                const delta = parseFloat(messageStr.split(':')[1]);
                 if (!isNaN(delta)) {
                     const newPosition = Math.min(100, Math.max(-100, props.modelValue + delta));
                     emit('update:modelValue', newPosition);
-                    publishLog('position', `Position adjusted by ${delta} to ${newPosition}`);
+                    // Publish new score
+                    client.publish('kistan/arcanescore', `client:${newPosition}`, { retain: true });
                 }
-            } catch (error) {
-                publishLog('error', `Invalid arcane command: ${error.message}`);
             }
         }
     });
