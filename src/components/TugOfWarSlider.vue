@@ -2,7 +2,7 @@
     <div>
         <v-slider
             class="tug-of-war-slider"
-            v-model="position"
+            :model-value="position"
             :min="-100"
             :max="100"
             label="Tug of War Slider"
@@ -16,13 +16,19 @@
 </template>
 
 <script setup>
-import { ref, defineEmits } from 'vue'
+import { defineEmits, defineProps } from 'vue'
 
-const emit = defineEmits(['update:position'])
-const position = ref(0)
+const props = defineProps({
+    position: {
+        type: Number,
+        required: true
+    }
+});
+
+const emit = defineEmits(['update:position']);
 
 const updatePosition = (value) => {
-    emit('update:position', value)
+    emit('update:position', value);
 }
 </script>
 
@@ -34,10 +40,6 @@ const updatePosition = (value) => {
 
 .tug-of-war-slider .v-slider-track__background {
     opacity: 1 !important;
-    height: var(--v-slider-track-size) !important;
-}
-
-.tug-of-war-slider .v-slider-track {
     height: var(--v-slider-track-size) !important;
 }
 </style>

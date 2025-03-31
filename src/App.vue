@@ -9,7 +9,7 @@
 </template>
 
 <script setup>
-import {ref, onMounted, onUnmounted} from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import ParallaxEffect from "@/components/ParallaxEffect.vue";
 import TugOfWarSlider from "@/components/TugOfWarSlider.vue";
 import MqttService from "@/components/MqttService.vue";

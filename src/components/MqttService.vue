@@ -1,13 +1,10 @@
 <template>
-    <div class="mqtt-debug" v-if="props.debug">
-        <p>MQTT Status: {{ connectionStatus }}</p>
-        <p>Position: {{ position }}</p>
+    <div v-if="debug" class="mqtt-debug">
+        <div>Connection Status: {{ connectionStatus }}</div>
+        <div>Position: {{ position }}</div>
         <div class="message-log">
-            <p>Last 10 messages:</p>
             <ul>
-                <li v-for="(msg, index) in messageLog" :key="index">
-                    {{ msg }}
-                </li>
+                <li v-for="(message, index) in messageLog" :key="index">{{ message }}</li>
             </ul>
         </div>
     </div>
@@ -16,173 +13,74 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import mqtt from 'mqtt';
+import { GameManager } from '@/utils/GameManager';
 
 const props = defineProps({
     debug: {
         type: Boolean,
         default: true
+    },
+    position: {
+        type: Number,
+        required: true
     }
 });
 
 const emit = defineEmits(['update:position']);
-const position = ref(0);
+
 const connectionStatus = ref('Disconnecting');
 const messageLog = ref([]);
-let client;
-
-const COMBO_TIMEOUT = 30 * 1000; // 30 seconds timeout between purchases
-
-const productConfig = {
-    'Pepsi': {
-        baseScore: 10,
-        team: 'red'
-    },
-    'Zingo': {
-        baseScore: -10,
-        team: 'blue'
-    },
-    'Cola': {
-        baseScore: 8,
-        team: 'red'
-    },
-    'Fanta': {
-        baseScore: -8,
-        team: 'blue'
-    },
-    'Din mamma': {  // Zaun test item
-        baseScore: -15,
-        team: 'blue'
-    },
-    'Is Vatten': {  // Piltover test item
-        baseScore: 15,
-        team: 'red'
-    }
-};
-
-// Kill streak configuration
-const killStreaks = {
-    4: { name: 'QUADRAKILL', multiplier: 1.2 },
-    5: { name: 'PENTAKILL', multiplier: 1.4 },
-    6: { name: 'HEXAKILL', multiplier: 1.6 }
-};
-
-const streakTracker = {
-    purchases: [], // Array of { team: string, timestamp: number }
-    currentStreak: 0,
-    lastTeam: null
-};
-
-const calculateKillStreak = (team, timestamp) => {
-    // Remove expired purchases
-    streakTracker.purchases = streakTracker.purchases.filter(p =>
-        timestamp - p.timestamp < COMBO_TIMEOUT
-    );
-
-    // Add new purchase
-    streakTracker.purchases.push({ team, timestamp });
-
-    // Count consecutive purchases for the same team
-    let streak = 0;
-    for (let i = streakTracker.purchases.length - 1; i >= 0; i--) {
-        if (streakTracker.purchases[i].team === team) {
-            streak++;
-        } else {
-            break;
-        }
-    }
-
-    // Get kill streak bonus if applicable
-    let multiplier = 1;
-    for (const [count, data] of Object.entries(killStreaks)) {
-        if (streak >= parseInt(count)) {
-            multiplier = data.multiplier;
-            addToMessageLog(`${data.name}! ${streak}x combo for team ${team}!`);
-        }
-    }
-
-    return multiplier;
-};
-
-const publishLog = (topic, message) => {
-    if (client && client.connected) {
-        client.publish('kistan/arcane/logs', JSON.stringify({
-            timestamp: Date.now(),
-            type: topic,
-            message: message
-        }));
-    }
-};
+let client = null;
+const gameManager = new GameManager();
 
 const addToMessageLog = (message) => {
-    messageLog.value.unshift(new Date().toLocaleTimeString() + ': ' + message);
-    if (messageLog.value.length > 10) {
+    messageLog.value.unshift(message);
+    if (messageLog.value.length > 100) {
         messageLog.value.pop();
     }
 };
 
+const publishLog = (type, message) => {
+    if (client && client.connected) {
+        const logMessage = {
+            type: type,
+            message: message,
+            timestamp: Date.now()
+        };
+        client.publish('kistan/arcane/log', JSON.stringify(logMessage));
+    }
+};
+
 const interpretReceipt = (receipt) => {
+    console.log('Processing receipt:', receipt);
     try {
-        let receiptData = JSON.parse(receipt);
-        let scoreChange = 0;
-        const timestamp = Date.now();
+        const receiptData = JSON.parse(receipt);
+        console.log('Parsed receipt:', receiptData);
 
-        if (receiptData.sold && Array.isArray(receiptData.sold)) {
-            receiptData.sold.forEach(item => {
-                if (item.name && productConfig[item.name]) {
-                    const product = productConfig[item.name];
-                    const count = item.count || 1;
+        const result = gameManager.processReceipt(receiptData);
+        console.log('Process result:', result);
 
-                    // Calculate base score
-                    let baseScore = product.baseScore * count;
-
-                    // Apply kill streak multiplier
-                    const multiplier = calculateKillStreak(product.team, timestamp);
-                    const finalScore = baseScore * multiplier;
-
-                    // Log purchase
-                    publishLog('purchase', `${item.name} x${count} for team ${product.team}`);
-
-                    // Log special messages for kill streaks
-                    if (streakTracker.purchases.length >= 4) {
-                        const streakCount = streakTracker.purchases.length;
-                        let killMessage = '';
-
-                        switch(streakCount) {
-                            case 4:
-                                killMessage = `QUADRAKILL! Team ${product.team} is on fire! (1.2x bonus)`;
-                                break;
-                            case 5:
-                                killMessage = `PENTAKILL! Team ${product.team} is unstoppable! (1.4x bonus)`;
-                                break;
-                            case 6:
-                                killMessage = `HEXAKILL! Team ${product.team} is legendary! (1.6x bonus)`;
-                                break;
-                        }
-
-                        if (killMessage) {
-                            publishLog('killstreak', killMessage);
-                            addToMessageLog(killMessage);
-                        }
-                    }
-
-                    scoreChange += finalScore;
-                    addToMessageLog(`${item.name} x${count}: ${finalScore} points (${multiplier}x multiplier)`);
-                }
-            });
+        for (const msg of result.messages) {
+            addToMessageLog(msg.message);
+            publishLog(msg.type, msg.message);
         }
 
-        if (scoreChange !== 0) {
-            const newPosition = Math.min(100, Math.max(-100, position.value + scoreChange));
-            position.value = newPosition;
+        if (result.scoreChange !== 0) {
+            const newPosition = Math.min(100, Math.max(-100, props.position + result.scoreChange));
             emit('update:position', newPosition);
 
-            // Log position change
-            publishLog('position', `Position changed by ${scoreChange} to ${newPosition}`);
-            addToMessageLog(`Total score change: ${scoreChange}. New position: ${newPosition}`);
+            const positionMessage = `Position changed by ${result.scoreChange} to ${newPosition}`;
+            publishLog('position', positionMessage);
+            addToMessageLog(positionMessage);
+
+            // Publish the new position to MQTT
+            client.publish('kistan/arcane', newPosition.toString());
         }
     } catch (e) {
-        addToMessageLog(`Error parsing receipt: ${e.message}`);
-        publishLog('error', `Error parsing receipt: ${e.message}`);
+        console.error('Receipt processing error:', e);
+        const errorMessage = `Error processing receipt: ${e.message}`;
+        addToMessageLog(errorMessage);
+        publishLog('error', errorMessage);
     }
 };
 
@@ -209,16 +107,15 @@ const connectMqtt = () => {
     });
 
     client.on('message', (topic, message) => {
-        const msg = `${topic}: ${message.toString()}`;
-        addToMessageLog(msg);
+        const messageStr = message.toString();
+        addToMessageLog(`${topic}: ${messageStr}`);
 
         if (topic === 'kistan/kvitto') {
-            interpretReceipt(message.toString());
+            interpretReceipt(messageStr);
         } else if (topic === 'kistan/arcane') {
-            const newPosition = parseFloat(message.toString());
+            const newPosition = parseFloat(messageStr);
             if (!isNaN(newPosition)) {
-                position.value = Math.min(100, Math.max(-100, newPosition));
-                emit('update:position', position.value);
+                emit('update:position', Math.min(100, Math.max(-100, newPosition)));
             }
         }
     });
