@@ -16,6 +16,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import mqtt from 'mqtt';
+import gameManager from '@/utils/GameManager';
 
 const props = defineProps({
     debug: {
@@ -29,79 +30,6 @@ const position = ref(0);
 const connectionStatus = ref('Disconnecting');
 const messageLog = ref([]);
 let client;
-
-const COMBO_TIMEOUT = 30 * 1000; // 30 seconds timeout between purchases
-
-const productConfig = {
-    'Pepsi': {
-        baseScore: 10,
-        team: 'red'
-    },
-    'Zingo': {
-        baseScore: -10,
-        team: 'blue'
-    },
-    'Cola': {
-        baseScore: 8,
-        team: 'red'
-    },
-    'Fanta': {
-        baseScore: -8,
-        team: 'blue'
-    },
-    'Din mamma': {  // Zaun test item
-        baseScore: -15,
-        team: 'blue'
-    },
-    'Is Vatten': {  // Piltover test item
-        baseScore: 15,
-        team: 'red'
-    }
-};
-
-// Kill streak configuration
-const killStreaks = {
-    4: { name: 'QUADRAKILL', multiplier: 1.2 },
-    5: { name: 'PENTAKILL', multiplier: 1.4 },
-    6: { name: 'HEXAKILL', multiplier: 1.6 }
-};
-
-const streakTracker = {
-    purchases: [], // Array of { team: string, timestamp: number }
-    currentStreak: 0,
-    lastTeam: null
-};
-
-const calculateKillStreak = (team, timestamp) => {
-    // Remove expired purchases
-    streakTracker.purchases = streakTracker.purchases.filter(p =>
-        timestamp - p.timestamp < COMBO_TIMEOUT
-    );
-
-    // Add new purchase
-    streakTracker.purchases.push({ team, timestamp });
-
-    // Count consecutive purchases for the same team
-    let streak = 0;
-    for (let i = streakTracker.purchases.length - 1; i >= 0; i--) {
-        if (streakTracker.purchases[i].team === team) {
-            streak++;
-        } else {
-            break;
-        }
-    }
-
-    // Get kill streak bonus if applicable
-    let multiplier = 1;
-    for (const [count, data] of Object.entries(killStreaks)) {
-        if (streak >= parseInt(count)) {
-            multiplier = data.multiplier;
-            addToMessageLog(`${data.name}! ${streak}x combo for team ${team}!`);
-        }
-    }
-
-    return multiplier;
-};
 
 const publishLog = (topic, message) => {
     if (client && client.connected) {
@@ -121,68 +49,30 @@ const addToMessageLog = (message) => {
 };
 
 const interpretReceipt = (receipt) => {
-    try {
-        let receiptData = JSON.parse(receipt);
-        let scoreChange = 0;
-        const timestamp = Date.now();
+    const result = gameManager.calculateReceipt(receipt);
 
-        if (receiptData.sold && Array.isArray(receiptData.sold)) {
-            receiptData.sold.forEach(item => {
-                if (item.name && productConfig[item.name]) {
-                    const product = productConfig[item.name];
-                    const count = item.count || 1;
+    if (result.error) {
+        addToMessageLog(`Error: ${result.error}`);
+        publishLog('error', result.error);
+        return;
+    }
 
-                    // Calculate base score
-                    let baseScore = product.baseScore * count;
+    // Log all messages
+    result.messages.forEach(msg => {
+        addToMessageLog(msg);
+    });
 
-                    // Apply kill streak multiplier
-                    const multiplier = calculateKillStreak(product.team, timestamp);
-                    const finalScore = baseScore * multiplier;
+    // Log purchases
+    result.purchases.forEach(purchase => {
+        publishLog('purchase', `${purchase.item} x${purchase.count} for team ${purchase.team}`);
+    });
 
-                    // Log purchase
-                    publishLog('purchase', `${item.name} x${count} for team ${product.team}`);
-
-                    // Log special messages for kill streaks
-                    if (streakTracker.purchases.length >= 4) {
-                        const streakCount = streakTracker.purchases.length;
-                        let killMessage = '';
-
-                        switch(streakCount) {
-                            case 4:
-                                killMessage = `QUADRAKILL! Team ${product.team} is on fire! (1.2x bonus)`;
-                                break;
-                            case 5:
-                                killMessage = `PENTAKILL! Team ${product.team} is unstoppable! (1.4x bonus)`;
-                                break;
-                            case 6:
-                                killMessage = `HEXAKILL! Team ${product.team} is legendary! (1.6x bonus)`;
-                                break;
-                        }
-
-                        if (killMessage) {
-                            publishLog('killstreak', killMessage);
-                            addToMessageLog(killMessage);
-                        }
-                    }
-
-                    scoreChange += finalScore;
-                    addToMessageLog(`${item.name} x${count}: ${finalScore} points (${multiplier}x multiplier)`);
-                }
-            });
-        }
-
-        if (scoreChange !== 0) {
-            const newPosition = Math.min(100, Math.max(-100, position.value + scoreChange));
-            position.value = newPosition;
-            emit('update:position', newPosition);
-
-            // Log position change
-            publishLog('position', `Position changed by ${scoreChange} to ${newPosition}`);
-            addToMessageLog(`Total score change: ${scoreChange}. New position: ${newPosition}`);
-        }
-    } catch (e) {
-        addToMessageLog(`Error parsing receipt: ${e.message}`);
-        publishLog('error', `Error parsing receipt: ${e.message}`);
+    // Update position if score changed
+    if (result.scoreChange !== 0) {
+        const newPosition = Math.min(100, Math.max(-100, position.value + result.scoreChange));
+        position.value = newPosition;
+        emit('update:position', newPosition);
+        publishLog('position', `Position changed by ${result.scoreChange} to ${newPosition}`);
     }
 };
 
