@@ -14,7 +14,7 @@ const props = defineProps({
 
 const gradientStyle = computed(() => {
     const absPosition = Math.abs(props.position);
-    const intensity = Math.min(0.3, Math.max(0, (absPosition - 30) / 100));
+    const intensity = Math.min(0.3, Math.max(0, (absPosition - 30) / 1000));
 
     if (props.position > 0) {
         return {

@@ -37,7 +37,7 @@ const lastUpdate = ref(0);
 let animationFrame;
 
 const generateBranch = (startX, startY, baseAngle, depth = 0) => {
-    const intensity = (Math.max(0.2, Math.min(1, Math.abs(props.position) / 100)))*0.5;
+    const intensity = (Math.max(0.2, Math.min(1, Math.abs(props.position) / 1000)))*0.5;
     const segments = [];
     let currentX = startX;
     let currentY = startY;
@@ -78,7 +78,7 @@ const generateBranch = (startX, startY, baseAngle, depth = 0) => {
 
 const updateLightning = () => {
     const currentTime = Date.now();
-    const intensity = (Math.max(0.2, Math.min(1, Math.abs(props.position) / 100)))*0.3;
+    const intensity = (Math.max(0.2, Math.min(1, Math.abs(props.position) / 1000)))*0.3;
     const updateInterval = 100 + (1 - intensity) * 300;
     const fadeTime = 50 + (1 - intensity) * 150;
 

@@ -70,11 +70,14 @@ const interpretReceipt = (receipt) => {
     });
 
     if (result.scoreChange !== 0) {
-        const newPosition = Math.min(100, Math.max(-100, props.modelValue + result.scoreChange));
+        const newPosition = Math.min(1000, Math.max(-1000, props.modelValue + result.scoreChange));
         emit('update:modelValue', newPosition);
         // Publish the new score with client identifier
         client.publish('kistan/arcanescore', `client:${newPosition}`, { retain: true });
         publishLog('position', `Position changed by ${result.scoreChange} to ${newPosition}`);
+    }
+    if (result.killStreak) {
+        emit('kill-streak', result.killStreak);
     }
 };
 
@@ -111,7 +114,7 @@ const connectMqtt = () => {
             if (messageStr.startsWith('admin:')) {
                 const delta = parseFloat(messageStr.split(':')[1]);
                 if (!isNaN(delta)) {
-                    const newPosition = Math.min(100, Math.max(-100, props.modelValue + delta));
+                    const newPosition = Math.min(1000, Math.max(-1000, props.modelValue + delta));
                     emit('update:modelValue', newPosition);
                     // Publish new score
                     client.publish('kistan/arcanescore', `client:${newPosition}`, { retain: true });

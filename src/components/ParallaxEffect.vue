@@ -90,24 +90,24 @@ const blueMaxScale = 1.5;
 
 const redImageStyle = computed(() => ({
     transform: `translate3d(
-        ${redMinX + (props.position / 100) * (redMaxX - redMinX)}px,
-        ${redMinY + (props.position / 100) * (redMaxY - redMinY)}px,
+        ${redMinX + (props.position / 1000) * (redMaxX - redMinX)}px,
+        ${redMinY + (props.position / 1000) * (redMaxY - redMinY)}px,
         0)
-        scale(${redMinScale + (props.position / 100) * (redMaxScale - redMinScale)})`,
+        scale(${redMinScale + (props.position / 1000) * (redMaxScale - redMinScale)})`,
     transition: "transform 0.2s ease"
 }));
 
 const blueImageStyle = computed(() => ({
     transform: `translate3d(
-        ${blueMinX + (-props.position / 100) * (blueMaxX - blueMinX)}px,
-        ${blueMinY + (-props.position / 100) * (blueMaxY - blueMinY)}px,
+        ${blueMinX + (-props.position / 1000) * (blueMaxX - blueMinX)}px,
+        ${blueMinY + (-props.position / 1000) * (blueMaxY - blueMinY)}px,
         0)
-        scale(${blueMinScale + (-props.position / 100) * (blueMaxScale - blueMinScale)})`,
+        scale(${blueMinScale + (-props.position / 1000) * (blueMaxScale - blueMinScale)})`,
     transition: "transform 0.2s ease"
 }));
 
 const backgroundStyle = computed(() => ({
-    transform: `scale(1.1) translateX(${(props.position / 200) * 30}px) rotateY(${(props.position / 100) * 5}deg)`,
+    transform: `scale(1.1) translateX(${(props.position / 200) * 30}px) rotateY(${(props.position / 1000) * 5}deg)`,
     transition: "transform 0.2s ease"
 }));
 const redLightingStyle = computed(() => ({

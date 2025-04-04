@@ -2,8 +2,8 @@
     <div class="tug-of-war-slider">
         <v-slider
             v-model="localPosition"
-            :min="-100"
-            :max="100"
+            :min="-1000"
+            :max="1000"
             label="Tug of War Slider"
             thumb-label
             color="red"

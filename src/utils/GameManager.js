@@ -1,12 +1,8 @@
-// src/utils/GameManager.js
-
-
-
 const productConfig = {
     'Pepsi': { baseScore: 10, combo: true},
     'Zingo': { baseScore: 10, combo: true},
     'Cola': { baseScore: 8, combo: true},
-    'Fanta': { baseScore: 8,combo: true},
+    'Fanta': { baseScore: 8, combo: true},
     'Din mamma': { baseScore: 15, combo: true},
     'Is Vatten': { baseScore: 15, combo: true}
 };
@@ -23,6 +19,7 @@ class GameManager {
         this.comboITK = [];
         console.log('GameManager initialized');
     }
+
     getItemCounts(array) {
         const counts = {};
         array.forEach(item => {
@@ -38,6 +35,7 @@ class GameManager {
             let currentMultiplier = team === 'ITK' ? -1 : 1;
             let totalScore = 0;
             let messages = [];
+            let killStreak = null;
 
             // Convert receipt items to flat array
             let items = [];
@@ -46,9 +44,6 @@ class GameManager {
                     items.push(item.name);
                 }
             }
-
-            console.log("SOLD ITEMS NEW ORDER: ");
-            console.log(items);
 
             // Update combo arrays with new items
             if (team === 'TMEIT') {
@@ -62,48 +57,49 @@ class GameManager {
             const currentItemCounts = this.getItemCounts(items);
             const comboItemCounts = this.getItemCounts(team === 'TMEIT' ? this.comboTMEIT : this.comboITK);
 
-            console.log("CURRENT ITEM COUNTS: ");
-            console.log(currentItemCounts);
-
-            console.log("COMBO ITEM COUNTS: ");
-            console.log(comboItemCounts);
-
             Object.entries(currentItemCounts).forEach(([item, count]) => {
                 if (!productConfig[item]) return;
 
                 const comboCount = comboItemCounts[item] || 0;
                 let basePoints = productConfig[item].baseScore * count;
 
-                console.log(`Processing ${item}: ${count} current, ${comboCount} in combo`);
-
                 if (comboCount >= 6) {
-                    points += basePoints * 1.6;
-                    messages.push(`HEXAKILL multiplier! ${count}x ${item} for ${basePoints * 1.6} points`);
-                    console.log(`HEXAKILL: Added ${basePoints * 1.6} points`);
+                    points += basePoints * killStreaks[6].multiplier;
+                    messages.push(`HEXAKILL multiplier! ${count}x ${item} for ${basePoints * killStreaks[6].multiplier} points`);
+                    killStreak = killStreaks[6].name;
                 } else if (comboCount === 5) {
-                    points += basePoints * 1.4;
-                    messages.push(`PENTAKILL multiplier! ${count}x ${item} for ${basePoints * 1.4} points`);
-                    console.log(`PENTAKILL: Added ${basePoints * 1.4} points`);
+                    points += basePoints * killStreaks[5].multiplier;
+                    messages.push(`PENTAKILL multiplier! ${count}x ${item} for ${basePoints * killStreaks[5].multiplier} points`);
+                    killStreak = killStreaks[5].name;
                 } else if (comboCount === 4) {
-                    points += basePoints * 1.2;
-                    messages.push(`QUADRAKILL multiplier! ${count}x ${item} for ${basePoints * 1.2} points`);
-                    console.log(`QUADRAKILL: Added ${basePoints * 1.2} points`);
+                    points += basePoints * killStreaks[4].multiplier;
+                    messages.push(`QUADRAKILL multiplier! ${count}x ${item} for ${basePoints * killStreaks[4].multiplier} points`);
+                    killStreak = killStreaks[4].name;
                 } else {
                     points += basePoints;
                     messages.push(`Base score: ${basePoints} points for ${count}x ${item}`);
-                    console.log(`Base: Added ${basePoints} points`);
                 }
             });
 
             totalScore = points * currentMultiplier;
 
-            console.log("FINAL SCORE: ");
-            console.log(totalScore);
+            // Clean up old combos after 30 seconds
+            const currentTime = Date.now();
+            if (team === 'TMEIT') {
+                setTimeout(() => {
+                    this.comboTMEIT = this.comboTMEIT.slice(items.length);
+                }, 30000);
+            } else {
+                setTimeout(() => {
+                    this.comboITK = this.comboITK.slice(items.length);
+                }, 30000);
+            }
 
             return {
                 scoreChange: Math.round(totalScore),
                 messages,
-                purchases: items.map(item => ({ item, count: 1, team }))
+                purchases: items.map(item => ({ item, count: 1, team })),
+                killStreak
             };
         } catch (error) {
             console.error("ERROR IN CALCULATE RECEIPT: ", error);
@@ -111,9 +107,15 @@ class GameManager {
                 error: 'Invalid receipt format: ' + error.message,
                 scoreChange: 0,
                 messages: [],
-                purchases: []
+                purchases: [],
+                killStreak: null
             };
         }
+    }
+
+    resetCombos() {
+        this.comboTMEIT = [];
+        this.comboITK = [];
     }
 }
 

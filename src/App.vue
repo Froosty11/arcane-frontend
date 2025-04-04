@@ -2,8 +2,25 @@
     <v-app>
         <v-container v-if="currentRoute === '/'" className="pa-0 ga-0 ma-0">
             <parallax-effect :position="position"/>
+            <health-bar
+                :position="position"
+                :width="800"
+                :bar-height="55"
+                :x-offset="38"
+                :up-offset="15"
+                :down-offset="30"
+            />
+            <multikill-display
+                v-if="currentKillStreak"
+                :kill-type="currentKillStreak"
+                :team="position >= 0 ? 'TMEIT' : 'ITK'"
+            />
             <tug-of-war-slider v-if="showDebug" v-model="position"/>
-            <mqtt-service v-model="position" :debug="showDebug"/>
+            <mqtt-service
+                v-model="position"
+                :debug="showDebug"
+                @kill-streak="handleKillStreak"
+            />
         </v-container>
         <admin-panel
             v-else-if="currentRoute === '/bombaclat'"
@@ -19,10 +36,21 @@ import ParallaxEffect from "@/components/ParallaxEffect.vue";
 import TugOfWarSlider from "@/components/TugOfWarSlider.vue";
 import MqttService from "@/components/MqttService.vue";
 import AdminPanel from "@/components/AdminPanel.vue";
+import HealthBar from "@/components/LeagueHealthbar.vue";
+import MultikillDisplay from "@/components/MultikillDisplay.vue";
 
 const position = ref(0);
 const showDebug = ref(true);
 const currentRoute = ref(window.location.pathname);
+
+const currentKillStreak = ref(null);
+
+const handleKillStreak = (type) => {
+    currentKillStreak.value = type;
+    setTimeout(() => {
+        currentKillStreak.value = null;
+    }, 4000);
+};
 
 const handleKeyPress = (event) => {
     if (event.code === 'Space') {
