@@ -6,9 +6,9 @@
                 :position="position"
                 :width="800"
                 :bar-height="55"
-                :x-offset="38"
-                :up-offset="15"
-                :down-offset="30"
+                :x-offset="500"
+                :up-offset="60"
+                :down-offset="70"
             />
             <multikill-display
                 v-if="currentKillStreak"
@@ -66,10 +66,32 @@ const handleRoute = () => {
 onMounted(() => {
     window.addEventListener('keydown', handleKeyPress);
     window.addEventListener('popstate', handleRoute);
+    document.body.style.overflow = 'hidden';
 });
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyPress);
     window.removeEventListener('popstate', handleRoute);
+    document.body.style.overflow = 'auto';
 });
 </script>
+
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+}
+
+.v-application {
+    overflow: hidden;
+}
+
+.v-container {
+    max-width: 100% !important;
+    padding: 0 !important;
+}
+</style>

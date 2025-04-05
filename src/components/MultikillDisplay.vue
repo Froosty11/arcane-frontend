@@ -1,7 +1,7 @@
 <template>
     <transition name="fade">
         <div v-if="isVisible" className="multikill-container">
-            <img :src="getKillStreakImage" :alt="props.killType" class="multikill-image">
+            <img :src="getKillStreakImage" :alt="props.killType" class="multikill-image" :class="{ 'fade-out': isFadingOut }">
         </div>
     </transition>
 </template>
@@ -21,42 +21,36 @@ const props = defineProps({
 });
 
 const isVisible = ref(false);
-const audio = ref(null);
+const isFadingOut = ref(false);
 
 const killStreakConfig = {
     QUADRAKILL: {
         TMEIT: {
-            image: new URL('@/assets/blue-quadrakill.png', import.meta.url).href,
-            sound: new URL('@/assets/quadrakill.ogg', import.meta.url).href,
+            image: new URL('@/assets/quadra-blue.png', import.meta.url).href,
             duration: 3000
         },
         ITK: {
-            image: new URL('@/assets/blue-quadrakill.png', import.meta.url).href,
-            sound: new URL('@/assets/quadrakill.ogg', import.meta.url).href,
+            image: new URL('@/assets/quadra-pink.png', import.meta.url).href,
             duration: 3000
         }
     },
     PENTAKILL: {
         TMEIT: {
-            image: new URL('@/assets/blue-pentakill.png', import.meta.url).href,
-            sound: new URL('@/assets/pentakill.ogg', import.meta.url).href,
+            image: new URL('@/assets/pentakill-blue', import.meta.url).href,
             duration: 3500
         },
         ITK: {
-            image: new URL('@/assets/blue-pentakill.png', import.meta.url).href,
-            sound: new URL('@/assets/pentakill.ogg', import.meta.url).href,
+            image: new URL('@/assets/pentakill-pink.png', import.meta.url).href,
             duration: 3500
         }
     },
     HEXAKILL: {
         TMEIT: {
-            image: new URL('@/assets/blue-hexakill.png', import.meta.url).href,
-            sound: new URL('@/assets/hexakill.ogg', import.meta.url).href,
+            image: new URL('@/assets/hexakill-blue.png', import.meta.url).href,
             duration: 4000
         },
         ITK: {
-            image: new URL('@/assets/blue-hexakill.png', import.meta.url).href,
-            sound: new URL('@/assets/hexakill.ogg', import.meta.url).href,
+            image: new URL('@/assets/hexakill-pink.png', import.meta.url).href,
             duration: 4000
         }
     }
@@ -71,16 +65,23 @@ const getKillStreakConfig = computed(() =>
 );
 
 onMounted(() => {
-    audio.value = new Audio(getKillStreakConfig.value.sound);
     showKillStreak();
 });
 
 const showKillStreak = () => {
     isVisible.value = true;
-    audio.value.play();
+    isFadingOut.value = false;
+
+    const fadeOutTime = 1000; // 1 second fade out
+    const displayDuration = getKillStreakConfig.value.duration - fadeOutTime;
+
+    setTimeout(() => {
+        isFadingOut.value = true;
+    }, displayDuration);
 
     setTimeout(() => {
         isVisible.value = false;
+        isFadingOut.value = false;
     }, getKillStreakConfig.value.duration);
 };
 </script>
@@ -94,6 +95,14 @@ const showKillStreak = () => {
     z-index: 1000;
 }
 
+.multikill-image {
+    transition: opacity 1s ease-in-out;
+    opacity: 1;
+}
+
+.multikill-image.fade-out {
+    opacity: 0;
+}
 
 .fade-enter-active,
 .fade-leave-active {

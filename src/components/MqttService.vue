@@ -29,7 +29,7 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'kill-streak']);
 const connectionStatus = ref('Disconnecting');
 const messageLog = ref([]);
 const clientId = 'vue_client_' + Math.random().toString(16).substr(2, 8);
@@ -72,12 +72,23 @@ const interpretReceipt = (receipt) => {
     if (result.scoreChange !== 0) {
         const newPosition = Math.min(1000, Math.max(-1000, props.modelValue + result.scoreChange));
         emit('update:modelValue', newPosition);
-        // Publish the new score with client identifier
         client.publish('kistan/arcanescore', `client:${newPosition}`, { retain: true });
         publishLog('position', `Position changed by ${result.scoreChange} to ${newPosition}`);
     }
+
     if (result.killStreak) {
         emit('kill-streak', result.killStreak);
+        switch (result.killStreak) {
+            case 'QUADRAKILL':
+                client.publish('light_mixer/code/run', 'tmeit_kmr25vt_quadrakill:start()');
+                break;
+            case 'PENTAKILL':
+                client.publish('light_mixer/code/run', 'tmeit_kmr25vt_pentakill:start()');
+                break;
+            case 'HEXAKILL':
+                client.publish('light_mixer/code/run', 'tmeit_kmr25vt_hexakill:start()');
+                break;
+        }
     }
 };
 
@@ -94,7 +105,7 @@ const connectMqtt = () => {
         connectionStatus.value = 'Connected';
         addToMessageLog('Connected successfully');
 
-        client.subscribe(['kistan/kvitto', 'kistan/arcane', 'kistan/arcanescore'], (err) => {
+        client.subscribe(['kistan/kvitto', 'kistan/arcane', 'kistan/arcanescore', 'kistan/arcane/admin'], (err) => {
             if (err) {
                 addToMessageLog('Subscribe error: ' + err.message);
             } else {
@@ -110,15 +121,44 @@ const connectMqtt = () => {
         if (topic === 'kistan/kvitto') {
             interpretReceipt(messageStr);
         } else if (topic === 'kistan/arcane') {
-            // Ignore messages from admin
             if (messageStr.startsWith('admin:')) {
                 const delta = parseFloat(messageStr.split(':')[1]);
                 if (!isNaN(delta)) {
                     const newPosition = Math.min(1000, Math.max(-1000, props.modelValue + delta));
                     emit('update:modelValue', newPosition);
-                    // Publish new score
                     client.publish('kistan/arcanescore', `client:${newPosition}`, { retain: true });
                 }
+            }
+        } else if (topic === 'kistan/arcane/admin') {
+            try {
+                const adminCommand = JSON.parse(messageStr);
+                switch (adminCommand.action) {
+                    case 'killstreak':
+                        emit('kill-streak', adminCommand.type);
+                        publishLog('admin', `Forced ${adminCommand.type} for ${adminCommand.team}`);
+                        switch (adminCommand.type) {
+                            case 'QUADRAKILL':
+                                client.publish('light_mixer/code/run', 'tmeit_kmr25vt_quadrakill:start()');
+                                break;
+                            case 'PENTAKILL':
+                                client.publish('light_mixer/code/run', 'tmeit_kmr25vt_pentakill:start()');
+                                break;
+                            case 'HEXAKILL':
+                                client.publish('light_mixer/code/run', 'tmeit_kmr25vt_hexakill:start()');
+                                break;
+                        }
+                        break;
+                    case 'resetCombo':
+                        gameManager.resetCombo(adminCommand.team);
+                        publishLog('admin', `Reset combo for ${adminCommand.team}`);
+                        break;
+                    case 'toggleCombos':
+                        gameManager.setCombosEnabled(adminCommand.enabled);
+                        publishLog('admin', `Combos ${adminCommand.enabled ? 'enabled' : 'disabled'}`);
+                        break;
+                }
+            } catch (error) {
+                addToMessageLog(`Error processing admin command: ${error.message}`);
             }
         }
     });

@@ -1,29 +1,29 @@
-const productConfig = {
-    'Pepsi': { baseScore: 10, combo: true},
-    'Zingo': { baseScore: 10, combo: true},
-    'Cola': { baseScore: 8, combo: true},
-    'Fanta': { baseScore: 8, combo: true},
-    'Din mamma': { baseScore: 15, combo: true},
-    'Is Vatten': { baseScore: 15, combo: true}
-};
-
-const killStreaks = {
-    4: { name: 'QUADRAKILL', multiplier: 1.2 },
-    5: { name: 'PENTAKILL', multiplier: 1.4 },
-    6: { name: 'HEXAKILL', multiplier: 1.6 }
-};
-
+// src/utils/GameManager.js
 class GameManager {
     constructor() {
         this.comboTMEIT = [];
         this.comboITK = [];
+        this.combosEnabled = true;
         console.log('GameManager initialized');
+    }
+
+    standardizeItems(items) {
+        return items.map(item => {
+            if (item.toLowerCase().includes('fulsprit')) {
+                return 'Fulsprit';
+            }
+            return item;
+        });
     }
 
     getItemCounts(array) {
         const counts = {};
         array.forEach(item => {
-            counts[item] = (counts[item] || 0) + 1;
+            if (item === 'Fulsprit') {
+                counts[item] = (counts[item] || 0) + 1/6; // Convert to "shots"
+            } else {
+                counts[item] = (counts[item] || 0) + 1;
+            }
         });
         return counts;
     }
@@ -31,69 +31,87 @@ class GameManager {
     calculateReceipt(receipt) {
         try {
             const receiptData = JSON.parse(receipt);
-            const team = receiptData.sold_by === 'TMEIT' ? 'TMEIT' : 'ITK';
-            let currentMultiplier = team === 'ITK' ? -1 : 1;
-            let totalScore = 0;
-            let messages = [];
-            let killStreak = null;
-
-            // Convert receipt items to flat array
             let items = [];
+
+            // Determine team based on Piltover/Zaun presence
+            const hasPiltover = receiptData.sold.some(item => item.name === 'Piltover');
+            const hasZaun = receiptData.sold.some(item => item.name === 'Zaun');
+
+            if (!hasPiltover && !hasZaun) {
+                return {
+                    error: 'No team indicator (Piltover/Zaun) found in receipt',
+                    scoreChange: 0,
+                    messages: [],
+                    purchases: [],
+                    killStreak: null
+                };
+            }
+
+            const team = hasPiltover ? 'TMEIT' : 'ITK';
+            const currentMultiplier = hasPiltover ? -1.8 : 1;
+
+            // Flatten and standardize items, excluding Piltover/Zaun
             for (const item of receiptData.sold) {
-                for (let i = 0; i < item.count; i++) {
-                    items.push(item.name);
+                if (item.name !== 'Piltover' && item.name !== 'Zaun') {
+                    for (let i = 0; i < item.count; i++) {
+                        items.push(item.name);
+                    }
                 }
             }
 
-            // Update combo arrays with new items
+            items = this.standardizeItems(items);
+
+            // If combos are disabled, return basic score
+            if (!this.combosEnabled) {
+                return {
+                    scoreChange: Math.round(10 * currentMultiplier),
+                    messages: [],
+                    purchases: items.map(item => ({ item, count: 1, team })),
+                    killStreak: null
+                };
+            }
+
+            // Update combo arrays
             if (team === 'TMEIT') {
                 this.comboTMEIT = [...this.comboTMEIT, ...items];
             } else {
                 this.comboITK = [...this.comboITK, ...items];
             }
 
-            // Calculate points based on current items but use multipliers from combo
-            let points = 0;
-            const currentItemCounts = this.getItemCounts(items);
+            let points = 10; // Base points for any purchase
+            let messages = [];
+            let killStreak = null;
+
             const comboItemCounts = this.getItemCounts(team === 'TMEIT' ? this.comboTMEIT : this.comboITK);
 
-            Object.entries(currentItemCounts).forEach(([item, count]) => {
-                if (!productConfig[item]) return;
-
-                const comboCount = comboItemCounts[item] || 0;
-                let basePoints = productConfig[item].baseScore * count;
-
-                if (comboCount >= 6) {
-                    points += basePoints * killStreaks[6].multiplier;
-                    messages.push(`HEXAKILL multiplier! ${count}x ${item} for ${basePoints * killStreaks[6].multiplier} points`);
-                    killStreak = killStreaks[6].name;
-                } else if (comboCount === 5) {
-                    points += basePoints * killStreaks[5].multiplier;
-                    messages.push(`PENTAKILL multiplier! ${count}x ${item} for ${basePoints * killStreaks[5].multiplier} points`);
-                    killStreak = killStreaks[5].name;
-                } else if (comboCount === 4) {
-                    points += basePoints * killStreaks[4].multiplier;
-                    messages.push(`QUADRAKILL multiplier! ${count}x ${item} for ${basePoints * killStreaks[4].multiplier} points`);
-                    killStreak = killStreaks[4].name;
-                } else {
-                    points += basePoints;
-                    messages.push(`Base score: ${basePoints} points for ${count}x ${item}`);
+            // Check for combos
+            Object.entries(comboItemCounts).forEach(([item, count]) => {
+                if (Math.floor(count) >= 6) {
+                    points *= 1.6;
+                    messages.push(`HEXAKILL: ${item} combo x${Math.floor(count)}`);
+                    killStreak = 'HEXAKILL';
+                } else if (Math.floor(count) === 5) {
+                    points *= 1.4;
+                    messages.push(`PENTAKILL: ${item} combo x${count}`);
+                    killStreak = 'PENTAKILL';
+                } else if (Math.floor(count) === 4) {
+                    points *= 1.2;
+                    messages.push(`QUADRAKILL: ${item} combo x${count}`);
+                    killStreak = 'QUADRAKILL';
                 }
             });
 
-            totalScore = points * currentMultiplier;
+            const totalScore = points * currentMultiplier;
 
             // Clean up old combos after 30 seconds
-            const currentTime = Date.now();
-            if (team === 'TMEIT') {
-                setTimeout(() => {
+            const cleanup = () => {
+                if (team === 'TMEIT') {
                     this.comboTMEIT = this.comboTMEIT.slice(items.length);
-                }, 30000);
-            } else {
-                setTimeout(() => {
+                } else {
                     this.comboITK = this.comboITK.slice(items.length);
-                }, 30000);
-            }
+                }
+            };
+            setTimeout(cleanup, 30000);
 
             return {
                 scoreChange: Math.round(totalScore),
@@ -110,6 +128,22 @@ class GameManager {
                 purchases: [],
                 killStreak: null
             };
+        }
+    }
+
+    resetCombo(team) {
+        if (team === 'TMEIT') {
+            this.comboTMEIT = [];
+        } else if (team === 'ITK') {
+            this.comboITK = [];
+        }
+    }
+
+    setCombosEnabled(enabled) {
+        this.combosEnabled = enabled;
+        if (!enabled) {
+            this.comboTMEIT = [];
+            this.comboITK = [];
         }
     }
 

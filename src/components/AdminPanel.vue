@@ -9,8 +9,8 @@
         <div class="manual-control">
             <h2>Manual Control</h2>
             <v-btn-group>
-                <v-btn @click="adjustPosition(-10)">-10</v-btn>
-                <v-btn @click="adjustPosition(-5)">-5</v-btn>
+                <v-btn @click="adjustPosition(-10*1.8)">-18</v-btn>
+                <v-btn @click="adjustPosition(-5*1.8)">-9</v-btn>
                 <v-btn @click="adjustPosition(5)">+5</v-btn>
                 <v-btn @click="adjustPosition(10)">+10</v-btn>
             </v-btn-group>
@@ -29,6 +29,36 @@
                 <li v-for="(msg, index) in messageLog" :key="index">{{ msg }}</li>
             </ul>
         </div>
+        <div class="killstreak-controls">
+            <h2>Killstreak Controls</h2>
+            <v-btn-group>
+                <v-btn color="blue" @click="triggerKillstreak('QUADRAKILL', 'ITK')">Quadra ITK</v-btn>
+                <v-btn color="blue" @click="triggerKillstreak('PENTAKILL', 'ITK')">Penta ITK</v-btn>
+                <v-btn color="blue" @click="triggerKillstreak('HEXAKILL', 'ITK')">Hexa ITK</v-btn>
+            </v-btn-group>
+
+            <v-btn-group class="mt-2">
+                <v-btn color="pink" @click="triggerKillstreak('QUADRAKILL', 'TMEIT')">Quadra TMEIT</v-btn>
+                <v-btn color="pink" @click="triggerKillstreak('PENTAKILL', 'TMEIT')">Penta TMEIT</v-btn>
+                <v-btn color="pink" @click="triggerKillstreak('HEXAKILL', 'TMEIT')">Hexa TMEIT</v-btn>
+            </v-btn-group>
+        </div>
+
+        <div class="combo-controls">
+            <h2>Combo Controls</h2>
+            <v-btn-group>
+                <v-btn color="blue" @click="resetCombo('ITK')">Reset ITK Combo</v-btn>
+                <v-btn color="pink" @click="resetCombo('TMEIT')">Reset TMEIT Combo</v-btn>
+            </v-btn-group>
+
+            <div class="mt-2">
+                <v-switch
+                    v-model="combosEnabled"
+                    label="Enable Combos"
+                    @change="toggleCombos"
+                ></v-switch>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -46,6 +76,40 @@ const props = defineProps({
         required: true
     }
 });
+
+
+const combosEnabled = ref(true);
+
+const triggerKillstreak = (type, team) => {
+    if (client && client.connected) {
+        client.publish('kistan/arcane/admin', JSON.stringify({
+            action: 'killstreak',
+            type,
+            team
+        }));
+        addToMessageLog(`Triggered ${type} for ${team}`);
+    }
+};
+
+const resetCombo = (team) => {
+    if (client && client.connected) {
+        client.publish('kistan/arcane/admin', JSON.stringify({
+            action: 'resetCombo',
+            team
+        }));
+        addToMessageLog(`Reset combo for ${team}`);
+    }
+};
+
+const toggleCombos = () => {
+    if (client && client.connected) {
+        client.publish('kistan/arcane/admin', JSON.stringify({
+            action: 'toggleCombos',
+            enabled: combosEnabled.value
+        }));
+        addToMessageLog(`Combos ${combosEnabled.value ? 'enabled' : 'disabled'}`);
+    }
+};
 
 const emit = defineEmits(['update:position', 'update:showDebug']);
 const connectionStatus = ref('Disconnecting');
@@ -177,5 +241,15 @@ onUnmounted(() => {
     word-break: break-all;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     padding: 2px 0;
+}
+.killstreak-controls, .combo-controls {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.v-btn-group {
+    margin: 5px 0;
 }
 </style>

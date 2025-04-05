@@ -9,11 +9,10 @@
             class="health-progress"
         >
             <template v-slot:default="{ value }">
-                <strong class="health-text">{{ Math.ceil(value) }}%</strong>
             </template>
         </v-progress-linear>
         <div class="vertical-divider" :style="dividerStyle"></div>
-        <img src="@/assets/healthbar-border.png" alt="border" class="border-overlay" :style="borderStyle"/>
+        <div class="border-overlay" :style="borderStyle"/>
     </div>
 </template>
 
@@ -65,10 +64,11 @@ const containerStyle = computed(() => ({
 }));
 
 const borderStyle = computed(() => ({
-    width: `calc(100% + ${props.xOffset * 2}px)`,
-    height: `calc(100% + ${props.upOffset + props.downOffset}px)`,
+    width: `${props.width + (props.xOffset * 2)}px`,
+    height: `${props.barHeight + props.upOffset + props.downOffset}px`,
     left: `-${props.xOffset}px`,
-    top: `-${props.upOffset}px`
+    top: `-${props.upOffset}px`,
+    transform: `scale(1)`
 }));
 const dividerStyle = computed(() => ({
     left: `${health.value}%`
@@ -83,6 +83,7 @@ const dividerStyle = computed(() => ({
 
 .health-progress {
     width: 100%;
+    height: 100%;
     z-index: 1;
 }
 
@@ -90,7 +91,10 @@ const dividerStyle = computed(() => ({
     position: absolute;
     z-index: 2;
     pointer-events: none;
-    object-fit: fill;
+    background-image: url('@/assets/healthbar-border.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    transform-origin: center;
 }
 
 .health-text {
@@ -109,6 +113,7 @@ const dividerStyle = computed(() => ({
     background: linear-gradient(to bottom, #ffa2ee, #640854) !important;
     transition: width 0.3s ease-out;
 }
+
 .vertical-divider {
     position: absolute;
     top: 0;
@@ -116,6 +121,6 @@ const dividerStyle = computed(() => ({
     width: 5px;
     background-color: black;
     z-index: 2;
-    transition: left 0.3s ease-out; /* Match the progress bar transition */
+    transition: left 0.3s ease-out;
 }
 </style>
